@@ -15,12 +15,12 @@
 
 Note: All parameters are required
 
-## Details
+### Details
 
 Source image cached for 1 hour.  
 Resized image cached for 1 hour.  
 Only JPEG format is supported.
 
-## Hey
+### Hey
 
 Try it and see for yourself.
