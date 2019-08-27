@@ -1,8 +1,8 @@
 ## JPEG image resizing service
 
 ### Run
-`go build .`  
-`./resizer`
+`dep ensure`
+`go run .`  
 
 ### Usage
 

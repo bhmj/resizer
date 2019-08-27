@@ -160,6 +160,7 @@ func main() {
 	}()
 
 	fmt.Println("started")
+	fmt.Println("usage: http://{hostname}:8080/api/v1/resizer/?url={url}&width={width}&height={height}")
 	<-shutdown
 
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
