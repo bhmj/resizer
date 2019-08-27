@@ -22,12 +22,17 @@ const port = ":8080"
 
 var alive = true // must use mutex or atomic but hey..
 
-func serverBadRequest(w http.ResponseWriter, s string) {
+func sayBadRequest(w http.ResponseWriter, s string) {
 	w.WriteHeader(http.StatusBadRequest)
 	w.Write([]byte(s))
 }
 
-func serverInternal(w http.ResponseWriter, s string) {
+func sayNotFound(w http.ResponseWriter, s string) {
+	w.WriteHeader(http.StatusNotFound)
+	w.Write([]byte(s))
+}
+
+func sayInternal(w http.ResponseWriter, s string) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte(s))
 }
@@ -37,7 +42,7 @@ func respond(w http.ResponseWriter, encoded *bytes.Buffer) {
 	w.Header().Set("Content-Length", strconv.Itoa(encoded.Len()))
 	_, err := io.Copy(w, encoded)
 	if err != nil {
-		serverInternal(w, err.Error())
+		sayInternal(w, err.Error())
 		return
 	}
 }
@@ -54,7 +59,18 @@ func MakeHandler(client *http.Client, cache storage.Storage) func(http.ResponseW
 
 		// some checks
 		if len(url) == 0 || len(width) == 0 || len(height) == 0 {
-			serverBadRequest(w, "url, width, height are required")
+			sayBadRequest(w, "url, width, height are required")
+			return
+		}
+		if url[0] == "" {
+			sayBadRequest(w, "no url specified")
+			return
+		}
+
+		iwidth, errW := strconv.Atoi(width[0])
+		iheight, errH := strconv.Atoi(height[0])
+		if errW != nil || errH != nil {
+			sayBadRequest(w, "bad width or height")
 			return
 		}
 
@@ -78,28 +94,21 @@ func MakeHandler(client *http.Client, cache storage.Storage) func(http.ResponseW
 		} else {
 			resp, err := client.Get(url[0])
 			if err != nil {
-				serverBadRequest(w, err.Error())
+				sayNotFound(w, err.Error())
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != 200 {
-				serverBadRequest(w, err.Error())
+				sayNotFound(w, "remote image not received")
 				return
 			}
 			img, _, err = image.Decode(resp.Body)
 			if err != nil {
-				serverInternal(w, err.Error())
+				sayInternal(w, err.Error())
 				return
 			}
 			cache.Put(url[0], img, time.Duration(1*time.Hour))
-		}
-
-		iwidth, errW := strconv.Atoi(width[0])
-		iheight, errH := strconv.Atoi(height[0])
-		if errW != nil || errH != nil {
-			serverBadRequest(w, "bad width or height")
-			return
 		}
 
 		dst := imaging.Resize(img, iwidth, iheight, imaging.Lanczos)
@@ -107,7 +116,7 @@ func MakeHandler(client *http.Client, cache storage.Storage) func(http.ResponseW
 		encoded := &bytes.Buffer{}
 		err = jpeg.Encode(encoded, dst, nil)
 		if err != nil {
-			serverInternal(w, err.Error())
+			sayInternal(w, err.Error())
 			return
 		}
 		cache.Put(fullKey, *encoded, time.Duration(1*time.Hour))

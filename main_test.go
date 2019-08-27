@@ -3,9 +3,6 @@ package main_test
 import (
 	"bytes"
 	"context"
-	"io"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -125,18 +122,10 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.WriteHeader(http.StatusOK)
 		w.Write(img40)
+	case "/not_found":
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusNotFound)
 	}
-}
-
-func imgHandler(w http.ResponseWriter, r *http.Request) {
-	// Очень простой хендлер проверки состояния.
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-
-	// В будущем мы хотим сообщать сообщать о состоянии
-	// базы данных или кеша (например Redis) выполняя
-	// простой PING и отдавать все это в запросе
-	io.WriteString(w, `{"alive": true}`)
 }
 
 func createHttpTest(t *testing.T) *httpexpect.Expect {
@@ -160,26 +149,63 @@ func TestMain(t *testing.T) {
 	e := createHttpTest(t)
 
 	testCases := []struct {
-		Url    string
-		Width  string
-		Height string
-	}{{
-		Url:    "http://foo.com/image40.jpg",
-		Width:  "10",
-		Height: "10",
-	}}
+		Url         string
+		Width       string
+		Height      string
+		ExpectCode  int
+		ContentType string
+		Err         string
+	}{
+		{
+			Url:         "http://foo.com/image40.jpg",
+			Width:       "10",
+			Height:      "10",
+			ExpectCode:  http.StatusOK,
+			ContentType: "image/jpeg",
+			Err:         "",
+		},
+		{
+			Url:         "http://foo.com/not_found",
+			Width:       "10",
+			Height:      "10",
+			ExpectCode:  http.StatusNotFound,
+			ContentType: "text/plain",
+			Err:         "remote image not received",
+		},
+		{
+			Url:         "",
+			Width:       "10",
+			Height:      "10",
+			ExpectCode:  http.StatusBadRequest,
+			ContentType: "text/plain",
+			Err:         "no url specified",
+		},
+		{
+			Url:         "http://foo.com/image40.jpg",
+			Width:       "xxx",
+			Height:      "10",
+			ExpectCode:  http.StatusBadRequest,
+			ContentType: "text/plain",
+			Err:         "bad width or height",
+		},
+	}
 
 	for _, tc := range testCases {
 		resp := e.GET("/api/v1/resizer/").WithQuery("url", tc.Url).WithQuery("width", tc.Width).WithQuery("height", tc.Height).Expect()
-		//resp.Status(http.StatusOK)
-		//resp.ContentType("image/jpeg")
-		raw := resp.Raw()
-		b, err := ioutil.ReadAll(raw.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if bytes.Compare(b, img10) != 0 {
-			t.Errorf("Resized image does not match:\nraw.b: %x\nimg10: %x", b, img10)
+		resp.Status(tc.ExpectCode)
+		resp.ContentType(tc.ContentType)
+		body := resp.Body().Raw()
+		if tc.ExpectCode != http.StatusOK {
+			// error message
+			if body != tc.Err {
+				t.Errorf("Error message mismatch\n:actual %s\nexpected: %s", body, tc.Err)
+			}
+		} else {
+			// body
+			raw := []byte(body)
+			if bytes.Compare(raw, img10) != 0 {
+				t.Errorf("Resized images mismatch:\nactual: %x\nexpected: %x", raw, img10)
+			}
 		}
 	}
 }
