@@ -40,6 +40,7 @@ func sayInternal(w http.ResponseWriter, s string) {
 func respond(w http.ResponseWriter, encoded *bytes.Buffer) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Length", strconv.Itoa(encoded.Len()))
+	w.Header().Set("Cache-Control", "max-age=3600")
 	_, err := io.Copy(w, encoded)
 	if err != nil {
 		sayInternal(w, err.Error())

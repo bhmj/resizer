@@ -56,7 +56,7 @@ func (s *storage) Get(key string) (interface{}, bool) {
 	return entry.Obj, found
 }
 
-// Store puts a record into cache
+// Put puts a record into cache
 func (s *storage) Put(key string, item interface{}, dur time.Duration) {
 	s.Lock()
 	_, found := s.data[key]
