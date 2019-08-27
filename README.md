@@ -1,7 +1,7 @@
 ## JPEG image resizing service
 
 ### Run
-`dep ensure`
+`dep ensure`  
 `go run .`  
 
 ### Usage
